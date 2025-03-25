@@ -1,8 +1,11 @@
+import argparse
+import os
 import re
 import json
 
 cve_pattern = r'\[ CVSS:v([23]) \] \[([HCMLI])\] (\d+\.\d+) / (CVE-\d+-\d+)'
 exploitable_pattern = r'Exploitable:\s+(.*)'
+description_pattern = r"Description:\s+(.*?)(?:Detections|Suppressed|Current date|$)"
 
 def parse_detections(text):
     results = []
@@ -16,7 +19,7 @@ def parse_detections(text):
 
             # Create a list and interate through applying the Regex
             lines = cleanDetectSection[0].splitlines()
-            pattern = r'^\s*[12]\)\s*(.*)$'
+            pattern = r'^\s*\d+\)\s*(.*)$'
             for line in lines:
                 match = re.match(pattern, line)
                 if match:
@@ -25,7 +28,7 @@ def parse_detections(text):
         else:
             # Create a list and interate through applying the Regex
             lines = detectSection[1].splitlines()
-            pattern = r'^\s*[12]\)\s*(.*)$'
+            pattern = r'^\s*\d+\)\s*(.*)$'
             for line in lines:
                 match = re.match(pattern, line)
                 if match:
@@ -41,6 +44,16 @@ def parse_detections(text):
 def parse_suppressed(text):
     results = []
     if "Suppressed ---------------------------------------------------------------------" in text:
+        suppressedSection = text.split("Suppressed ---------------------------------------------------------------------" )
+
+        lines = suppressedSection[1].splitlines()
+        pattern = r'^\s*\d+\)\s*(.*)$'
+        for line in lines:
+                match = re.match(pattern, line)
+                if match:
+                    # Extract the data after 1) or 2)
+                    results.append(match.group(1))
+
         return results
     else:
         return None
@@ -53,10 +66,10 @@ def parse_input(input_text):
     sections = input_text.split('--------------------------------------------------------------------------------')
 
     # Parse the main section
-    for i, section in enumerate(sections[1:4]):
+    for i, section in enumerate(sections[1:]):
         parsed = {}
         temp = section.strip()
-        #print(temp)
+
 
         # Get CVE Name
         cve_name = re.search(cve_pattern, temp).group(4)
@@ -65,6 +78,17 @@ def parse_input(input_text):
         # Get CVSS Score
         cvss_score = re.search(cve_pattern, temp).group(3)
         parsed['cve_score']=float(cvss_score)
+
+        # Get Exploitable
+        exploitable = re.search(exploitable_pattern, temp)
+        parsed["exploitable"] = exploitable.group(1)
+
+        # Get Description
+        description = re.search(description_pattern, temp, re.DOTALL)
+        #print(description.group(1).strip().replace("\n", "").replace("\t", ""))
+        description = description.group(1).strip().replace("\n", "").replace("\t", "")
+        description = re.sub(r'\s+', ' ', description)
+        parsed['description'] = description
 
         parsed['detections']=parse_detections(temp)
         parsed['suppressed']=parse_suppressed(temp)
@@ -76,10 +100,20 @@ def parse_input(input_text):
     return result
 
 def main():
-    # Prompt the user to enter the file path
-    #file_path = input("Enter the path to the input text file: ")
 
-    file_path = "Examples/vulns.txt"
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description="Process a file with an optional file path.")
+    parser.add_argument("file_path", nargs="?", default="default_file.txt", help="Path to the file to process")
+
+    # Parse arguments
+    args = parser.parse_args()
+    file_path = args.file_path
+
+    # If the file path is not provided, prompt user
+    if file_path == "default_file.txt" and not os.path.exists(file_path):
+        # Prompt the user to enter the file path
+        file_path = input("Enter the path to the input text file: ")
+
     try:
         # Read the content of the file
         with open(file_path, 'r') as file:
@@ -89,9 +123,9 @@ def main():
         parsed_data = parse_input(input_text)
         json_output = json.dumps(parsed_data, indent=2)
 
-        # Print JSON output
-        print("\nJSON Output:")
-        print(json_output)
+        # Output JSON output
+        with open("vulns.json", "w") as out:
+            out.write(json.dumps(json_output))
 
     except FileNotFoundError:
         print(f"Error: The file '{file_path}' was not found.")
