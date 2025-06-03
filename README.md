@@ -11,5 +11,5 @@ Running the rl-secure find CVE* command outputs non-standard but semi-structucur
 ```
 #### Convert to JSON
 ```
-python3 vulns2JSON.py
+python3 vuln2JSON.py
 ```
