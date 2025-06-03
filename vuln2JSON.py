@@ -116,17 +116,19 @@ def main():
 
     try:
         # Read the content of the file
-        with open(file_path, 'r') as file:
+        with open(file_path, 'r', encoding='utf-8') as file:
             input_text = file.read()
+        file.close()
 
         # Parse input and convert to JSON
         parsed_data = parse_input(input_text)
         json_output = json.dumps(parsed_data, indent=2)
 
         # Output JSON output
-        with open("vulns.json", "w") as out:
-            out.write(json.dumps(json_output))
-
+        with open("vulns.json", "w", encoding='utf-8') as out:
+            out.write(json_output)
+        out.close()
+        
     except FileNotFoundError:
         print(f"Error: The file '{file_path}' was not found.")
     except Exception as e:
